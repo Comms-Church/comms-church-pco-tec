@@ -34,11 +34,6 @@ class CCTEC_API {
 
     /**
      * Authenticated GET against any PCO API base URL.
-     *
-     * @param string $base     One of the BASE constants.
-     * @param string $endpoint Path starting with '/', e.g. '/events'.
-     * @param array  $params   Query-string parameters.
-     * @return array|WP_Error  Decoded JSON array or WP_Error.
      */
     private function get( string $base, string $endpoint, array $params = [] ) {
         if ( ! $this->is_configured() ) {
@@ -75,19 +70,6 @@ class CCTEC_API {
 
     // ── Calendar v2 endpoints ─────────────────────────────────────────────────
 
-    /**
-     * Fetch a page of events.
-     *
-     * Useful params:
-     *   per_page   int  (max 100)
-     *   offset     int
-     *   filter     string  'future' | 'past' | 'all'  (PCO uses date ranges on event instances; filter here is advisory)
-     *   after      ISO8601 datetime – only events whose instances start on/after this
-     *   before     ISO8601 datetime
-     *   include    comma list: 'event_instances,event_times,location,tags,event_connections'
-     *
-     * @return array|WP_Error
-     */
     public function get_events( array $args = [] ): array|WP_Error {
         $defaults = [
             'per_page' => 100,
@@ -96,26 +78,12 @@ class CCTEC_API {
         return $this->get( self::CALENDAR_BASE, '/events', wp_parse_args( $args, $defaults ) );
     }
 
-    /**
-     * Fetch a single event by its PCO calendar event ID.
-     *
-     * @param string|int $id
-     * @return array|WP_Error
-     */
     public function get_event( $id ): array|WP_Error {
         return $this->get( self::CALENDAR_BASE, '/events/' . intval( $id ), [
             'include' => 'event_instances,event_times,location,tags',
         ] );
     }
 
-    /**
-     * Fetch event instances (occurrences) for a specific event.
-     * Instances carry the concrete start/end datetimes.
-     *
-     * @param string|int $event_id
-     * @param array      $args     Optional per_page, offset, filter
-     * @return array|WP_Error
-     */
     public function get_event_instances( $event_id, array $args = [] ): array|WP_Error {
         return $this->get( self::CALENDAR_BASE, '/events/' . intval( $event_id ) . '/event_instances',
             wp_parse_args( $args, [ 'per_page' => 50 ] )
@@ -123,14 +91,13 @@ class CCTEC_API {
     }
 
     /**
-     * Fetch all event_instances (upcoming) in one shot — used for the full sync.
-     * Iterates pages automatically up to $max_pages.
+     * Fetch all future event_instances, paginated. Used for Calendar and Both modes.
+     * Builds included index once per page to avoid memory explosion.
      *
-     * @param string $after      ISO8601 — omit events before this date.
-     * @param int    $max_pages  Safety cap to avoid runaway loops.
-     * @return array             Flat array of event_instance resource objects.
+     * @param int $max_pages  Safety cap.
+     * @return array  Flat array of event_instance resource objects.
      */
-    public function get_all_event_instances( string $after = '', int $max_pages = 20 ): array {
+    public function get_all_event_instances( int $max_pages = 20 ): array {
         $results = [];
         $offset  = 0;
         $per     = 100;
@@ -138,8 +105,12 @@ class CCTEC_API {
 
         do {
             // Always filter to future instances to avoid loading all historical data.
-            $params = [ 'per_page' => $per, 'offset' => $offset, 'include' => 'event,location', 'filter' => 'future' ];
-            if ( $after ) $params['after'] = $after;
+            $params = [
+                'per_page' => $per,
+                'offset'   => $offset,
+                'include'  => 'event,location',
+                'filter'   => 'future',
+            ];
 
             $body = $this->get( self::CALENDAR_BASE, '/event_instances', $params );
             if ( is_wp_error( $body ) ) break;
@@ -148,9 +119,9 @@ class CCTEC_API {
             $included = $body['included'] ?? [];
             $total    = $body['meta']['total_count'] ?? count( $data );
 
-            // Index included resources ONCE per page, then attach a lightweight
-            // reference key so sync can look up event/location without duplicating
-            // the full included blob onto every instance (which exhausts memory).
+            // Build included index ONCE per page, attach reference to each instance.
+            // Do NOT call index_included() inside the loop — that duplicates the full
+            // included blob onto every instance and exhausts PHP memory on large calendars.
             $included_index = $this->index_included( $included );
             foreach ( $data as &$instance ) {
                 $instance['_included'] = $included_index;
@@ -167,46 +138,77 @@ class CCTEC_API {
     }
 
     /**
-     * Fetch resource locations (venues) from PCO Calendar.
+     * Fetch all signups that have a linked PCO Calendar event, paginated.
+     * Used for Registrations-only mode — only signups with a calendar event
+     * get synced to TEC.
      *
-     * @return array|WP_Error
+     * @param int $max_pages
+     * @return array  Flat array of signup resource objects with _calendar_event attached.
      */
+    public function get_all_registration_instances( int $max_pages = 20 ): array {
+        $results = [];
+        $offset  = 0;
+        $per     = 100;
+        $page    = 0;
+
+        do {
+            $body = $this->get( self::REGISTRATIONS_BASE, '/signups', [
+                'per_page' => $per,
+                'offset'   => $offset,
+                'filter'   => 'unarchived',
+                'include'  => 'event',
+            ] );
+            if ( is_wp_error( $body ) ) break;
+
+            $data     = $body['data']     ?? [];
+            $included = $body['included'] ?? [];
+            $total    = $body['meta']['total_count'] ?? count( $data );
+
+            $included_index = $this->index_included( $included );
+
+            foreach ( $data as &$signup ) {
+                // Only include signups that are linked to a calendar event.
+                $cal_event_id = $signup['relationships']['event']['data']['id'] ?? '';
+                if ( ! $cal_event_id ) continue;
+
+                $cal_event = $included_index['Event'][ $cal_event_id ] ?? null;
+                if ( ! $cal_event ) {
+                    // Fetch the calendar event directly if not included.
+                    $fetched   = $this->get_event( $cal_event_id );
+                    $cal_event = is_wp_error( $fetched ) ? null : ( $fetched['data'] ?? null );
+                }
+
+                $signup['_calendar_event'] = $cal_event;
+                $results[] = $signup;
+            }
+            unset( $signup, $included_index );
+
+            $offset += $per;
+            $page++;
+
+        } while ( count( $results ) < $total && $page < $max_pages );
+
+        return $results;
+    }
+
     public function get_locations( array $args = [] ): array|WP_Error {
         return $this->get( self::CALENDAR_BASE, '/locations', wp_parse_args( $args, [ 'per_page' => 100 ] ) );
     }
 
     // ── Registrations v2 endpoints ────────────────────────────────────────────
 
-    /**
-     * Fetch all signups, optionally filtered by status.
-     * Used when 'pull_registrations' setting is on to match signups to calendar events.
-     *
-     * @return array|WP_Error
-     */
     public function get_signups( array $args = [] ): array|WP_Error {
         return $this->get( self::REGISTRATIONS_BASE, '/signups',
             wp_parse_args( $args, [ 'per_page' => 100, 'filter' => 'unarchived' ] )
         );
     }
 
-    /**
-     * Fetch a single signup with its selection types (ticket tiers / prices).
-     *
-     * @param int $signup_id
-     * @return array|WP_Error
-     */
     public function get_signup( int $signup_id ): array|WP_Error {
         return $this->get( self::REGISTRATIONS_BASE, '/signups/' . $signup_id, [
             'include' => 'selection_types,signup_location',
         ] );
     }
 
-    /**
-     * Fetch selection types (ticket/price tiers) for a signup.
-     *
-     * @param int $signup_id
-     * @return array|WP_Error
-     */
     public function get_selection_types( int $signup_id ): array|WP_Error {
         return $this->get( self::REGISTRATIONS_BASE,
             '/signups/' . $signup_id . '/selection_types',
@@ -219,9 +221,6 @@ class CCTEC_API {
     /**
      * Build a keyed map of included resources by type+id for O(1) lookups.
      * e.g. $map['Event']['12345'] = [ 'id'=>..., 'attributes'=>... ]
-     *
-     * @param array $included  The 'included' array from a PCO JSON:API response.
-     * @return array
      */
     public function index_included( array $included ): array {
         $map = [];
@@ -235,12 +234,6 @@ class CCTEC_API {
         return $map;
     }
 
-    /**
-     * Build an indexed map of signups keyed by the signup name (lowercased/trimmed)
-     * so the sync engine can fuzzy-match them to calendar event names.
-     *
-     * @return array  [ 'event name' => signup_resource ]
-     */
     public function get_signups_by_name(): array {
         $body = $this->get_signups();
         if ( is_wp_error( $body ) ) return [];

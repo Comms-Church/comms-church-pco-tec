@@ -3,7 +3,7 @@
  * Plugin Name: Comms.Church — PCO Events → The Events Calendar
  * Plugin URI:  https://comms.church
  * Description: Syncs Planning Center Events (and optional Registrations signup links) into The Events Calendar. Automatic scheduled sync + manual trigger. API credentials stored securely server-side.
- * Version:     1.0.1
+ * Version:     1.1.0
  * Author:      Comms.Church
  * Author URI:  https://comms.church
  * License:     GPL-2.0+
@@ -14,7 +14,7 @@
 
 if ( ! defined( 'ABSPATH' ) ) exit;
 
-define( 'CCTEC_VERSION',     '1.0.1' );
+define( 'CCTEC_VERSION',     '1.1.0' );
 define( 'CCTEC_PLUGIN_DIR',  plugin_dir_path( __FILE__ ) );
 define( 'CCTEC_PLUGIN_URL',  plugin_dir_url( __FILE__ ) );
 define( 'CCTEC_PLUGIN_FILE', __FILE__ );
@@ -69,6 +69,9 @@ class CCTEC {
         }
         if ( false === get_option( 'cctec_sync_lookback_days' ) ) {
             update_option( 'cctec_sync_lookback_days', 0 ); // future only
+        }
+        if ( false === get_option( 'cctec_sync_source' ) ) {
+            update_option( 'cctec_sync_source', 'registrations_only' );
         }
         if ( false === get_option( 'cctec_pull_registrations' ) ) {
             update_option( 'cctec_pull_registrations', '0' );

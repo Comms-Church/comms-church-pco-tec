@@ -59,6 +59,9 @@ class CCTEC_Admin {
             'sanitize_callback' => function( $v ) { return max( 0, intval( $v ) ); },
         ] );
 
+        // ── Sync source ──────────────────────────────────────────────────
+        register_setting( self::OPTION_GROUP, 'cctec_sync_source', [ 'sanitize_callback' => [ $this, 'sanitize_sync_source' ] ] );
+
         // ── Registrations ────────────────────────────────────────────────
         register_setting( self::OPTION_GROUP, 'cctec_pull_registrations', [ 'sanitize_callback' => 'sanitize_text_field' ] );
 
@@ -66,6 +69,10 @@ class CCTEC_Admin {
         register_setting( self::OPTION_GROUP, 'cctec_cache_ttl', [
             'sanitize_callback' => function( $v ) { return max( 60, intval( $v ) ); },
         ] );
+    }
+
+    public function sanitize_sync_source( $v ): string {
+        return in_array( $v, [ 'registrations_only', 'calendar_all', 'both' ], true ) ? $v : 'registrations_only';
     }
 
     public function sanitize_frequency( $v ): string {
@@ -235,22 +242,33 @@ class CCTEC_Admin {
                     </table>
                 </div>
 
-                <?php /* ── 3. Registrations ── */ ?>
+                <?php /* ── 3. Sync Source ── */ ?>
                 <div class="cctec-card">
-                    <h2><?php esc_html_e( 'Registrations (Optional)', 'comms-church-pco-tec' ); ?></h2>
-                    <p><?php esc_html_e( 'When enabled, the sync will try to match each calendar event to a PCO Signup of the same name and attach the registration URL and ticket prices to the TEC event post.', 'comms-church-pco-tec' ); ?></p>
+                    <h2><?php esc_html_e( 'What to Sync', 'comms-church-pco-tec' ); ?></h2>
+                    <p><?php esc_html_e( 'Choose which Planning Center data drives the sync. Most churches should use Registrations Only.', 'comms-church-pco-tec' ); ?></p>
                     <table class="form-table">
                         <tr>
-                            <th><?php esc_html_e( 'Pull Registrations', 'comms-church-pco-tec' ); ?></th>
+                            <th><label for="cctec_sync_source"><?php esc_html_e( 'Sync Source', 'comms-church-pco-tec' ); ?></label></th>
                             <td>
-                                <label>
-                                    <input type="checkbox" name="cctec_pull_registrations" value="1" <?php checked( get_option( 'cctec_pull_registrations', '0' ), '1' ); ?>>
-                                    <?php esc_html_e( 'Match calendar events to PCO Signups and attach registration data', 'comms-church-pco-tec' ); ?>
+                                <?php $source = get_option( 'cctec_sync_source', 'registrations_only' ); ?>
+                                <label style="display:block;margin-bottom:8px">
+                                    <input type="radio" name="cctec_sync_source" value="registrations_only" <?php checked( $source, 'registrations_only' ); ?>>
+                                    <strong><?php esc_html_e( 'Registrations Only', 'comms-church-pco-tec' ); ?></strong>
+                                    — <?php esc_html_e( 'Only sync events that have a linked PCO Signup. Registration URLs and ticket prices are always attached. Recommended for most churches.', 'comms-church-pco-tec' ); ?>
+                                </label>
+                                <label style="display:block;margin-bottom:8px">
+                                    <input type="radio" name="cctec_sync_source" value="calendar_all" <?php checked( $source, 'calendar_all' ); ?>>
+                                    <strong><?php esc_html_e( 'All Calendar Events', 'comms-church-pco-tec' ); ?></strong>
+                                    — <?php esc_html_e( 'Sync every future event from PCO Calendar, including recurring series. Registration data is attached where a matching Signup name is found.', 'comms-church-pco-tec' ); ?>
+                                </label>
+                                <label style="display:block">
+                                    <input type="radio" name="cctec_sync_source" value="both" <?php checked( $source, 'both' ); ?>>
+                                    <strong><?php esc_html_e( 'Both', 'comms-church-pco-tec' ); ?></strong>
+                                    — <?php esc_html_e( 'All calendar events synced, and registration data is always attempted for every event regardless of name match.', 'comms-church-pco-tec' ); ?>
                                 </label>
                             </td>
                         </tr>
                     </table>
-                    <p class="description"><?php esc_html_e( 'Matching is done by event name (case-insensitive). If your PCO event is named "Easter Service" and your signup is also named "Easter Service", they will be linked automatically.', 'comms-church-pco-tec' ); ?></p>
                 </div>
 
                 <?php /* ── 4. Cache ── */ ?>
