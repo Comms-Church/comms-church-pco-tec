@@ -50,9 +50,12 @@ class CCTEC_Shortcodes {
         add_shortcode( 'pco_event_card', [ $this, 'render_event_card' ] );
         add_action( 'wp_enqueue_scripts', [ $this, 'enqueue_front_assets' ] );
 
-        // Automatically inject the Register button on TEC single event pages,
-        // after the event description and before the Add to Calendar widget.
-        add_action( 'tribe_events_single_event_after_the_content', [ $this, 'inject_register_button' ] );
+        // Inject the Register button on TEC single event pages.
+        // We filter the_content rather than using a TEC action hook because
+        // page builders (Bricks, Elementor, Divi) bypass TEC's native PHP
+        // templates entirely, so tribe_events_single_event_after_the_content
+        // never fires. the_content filter works regardless of page builder.
+        add_filter( 'the_content', [ $this, 'append_register_button_to_content' ] );
     }
 
     // ── Asset loading ─────────────────────────────────────────────────────────
@@ -265,30 +268,38 @@ class CCTEC_Shortcodes {
     // ── Auto-inject on TEC single event pages ────────────────────────────────
 
     /**
-     * Fires after the event description on TEC single event pages.
-     * Renders a Register Now button only when the event has a PCO registration URL.
-     * Respects the global brand color and a 'disable' option for per-event opt-out.
+     * Appended to the_content on TEC single event pages.
+     * Works with Bricks Builder, Elementor, Divi, and native TEC templates
+     * because it runs at the WordPress content filter level, not a TEC hook.
+     *
+     * @param string $content  The post content.
+     * @return string  Content with the button appended, or unchanged.
      */
-    public function inject_register_button(): void {
-        $post_id = get_the_ID();
-        if ( ! $post_id ) return;
+    public function append_register_button_to_content( string $content ): string {
+        // Only run on the main query for a single tribe_events post.
+        if ( ! is_singular( 'tribe_events' ) ) return $content;
+        if ( ! in_the_loop() || ! is_main_query() ) return $content;
 
-        // Only show on events synced from PCO (have a registration URL).
+        $post_id = get_the_ID();
+        if ( ! $post_id ) return $content;
+
         $reg_url = get_post_meta( $post_id, '_pco_registration_url', true );
-        if ( ! $reg_url ) return;
+        if ( ! $reg_url ) return $content;
 
         $color = $this->resolve_color( '' );
         $label = get_option( 'cctec_register_label', __( 'Register Now', 'comms-church-pco-tec' ) );
 
         $this->do_enqueue();
 
-        echo '<div class="cctec-single-register">';
-        echo '<a href="' . esc_url( $reg_url ) . '" class="cctec-btn cctec-btn-primary" '
-           . 'style="--cctec-brand:' . esc_attr( $color ) . '" '
-           . 'target="_blank" rel="noopener noreferrer">'
-           . esc_html( $label )
-           . '</a>';
-        echo '</div>';
+        $button = '<div class="cctec-single-register">'
+            . '<a href="' . esc_url( $reg_url ) . '" class="cctec-btn cctec-btn-primary" '
+            . 'style="--cctec-brand:' . esc_attr( $color ) . '" '
+            . 'target="_blank" rel="noopener noreferrer">'
+            . esc_html( $label )
+            . '</a>'
+            . '</div>';
+
+        return $content . $button;
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────
