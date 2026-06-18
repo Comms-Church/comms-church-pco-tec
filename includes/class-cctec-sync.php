@@ -196,22 +196,33 @@ class CCTEC_Sync {
      * Create or update a TEC event from a PCO Signup (registrations_only mode).
      * Dates and title come from the linked PCO Calendar event.
      *
-     * @param array $signup  PCO signup resource with _calendar_event attached.
+     * @param array $signup  PCO signup resource with _next_time and _location attached.
      * @param bool  $force
      * @return string|WP_Error  'created' | 'updated' | 'noop' | WP_Error
      */
     private function upsert_from_signup( array $signup, bool $force ) {
-        $signup_id   = $signup['id']          ?? '';
-        $attrs       = $signup['attributes']  ?? [];
-        $cal_event   = $signup['_calendar_event'] ?? null;
-        $cal_attrs   = $cal_event['attributes'] ?? [];
+        $signup_id   = $signup['id']         ?? '';
+        $attrs       = $signup['attributes'] ?? [];
 
-        $name        = sanitize_text_field( $cal_attrs['name'] ?? $attrs['name'] ?? '' );
-        $description = wp_kses_post( $cal_attrs['description'] ?? '' );
-        $starts_at   = $cal_attrs['starts_at'] ?? '';
-        $ends_at     = $cal_attrs['ends_at']   ?? '';
-        $pco_url     = $attrs['registration_url'] ?? $attrs['public_url'] ?? $cal_attrs['public_url'] ?? '';
+        // Dates come from the SignupTime resource (next_signup_time relationship),
+        // NOT the Calendar API. The Registrations API is self-contained.
+        $next_time   = $signup['_next_time'] ?? null;
+        $time_attrs  = $next_time['attributes'] ?? [];
+        $location    = $signup['_location']  ?? null;
+        $loc_attrs   = $location['attributes'] ?? [];
+
+        $name        = sanitize_text_field( $attrs['name'] ?? '' );
+        $description = wp_kses_post( $attrs['description'] ?? '' );
+        $starts_at   = $time_attrs['starts_at'] ?? '';
+        $ends_at     = $time_attrs['ends_at']   ?? '';
+        $all_day     = (bool) ( $time_attrs['all_day'] ?? false );
+        $pco_url     = $attrs['new_registration_url'] ?? $attrs['registration_url'] ?? $attrs['public_url'] ?? '';
         $updated_at  = $attrs['updated_at'] ?? '';
+
+        // Location string for venue creation
+        $loc_name    = $loc_attrs['name'] ?? '';
+        $loc_address = $loc_attrs['full_formatted_address'] ?? $loc_attrs['formatted_address'] ?? '';
+
 
         if ( ! $name ) {
             return new WP_Error( 'cctec_missing_fields', "Signup {$signup_id} skipped — no event name." );
@@ -235,6 +246,7 @@ class CCTEC_Sync {
             'post_content' => $description,
             'post_status'  => 'publish',
             'post_type'    => self::TEC_CPT,
+            'EventAllDay'  => $all_day ? 'yes' : '',
             'EventURL'     => esc_url_raw( $pco_url ),
         ], $this->date_args( $start_date, $end_date ?: $start_date ) );
 
@@ -481,7 +493,7 @@ class CCTEC_Sync {
         if ( ! is_wp_error( $types_body ) ) {
             foreach ( $types_body['data'] ?? [] as $type ) {
                 $ta  = $type['attributes'] ?? [];
-                $amt = isset( $ta['amount_cents'] ) ? $ta['amount_cents'] / 100 : null;
+                $amt = isset( $ta['price_cents'] ) ? $ta['price_cents'] / 100 : null;
 
                 $ticket_types[] = [
                     'name'     => sanitize_text_field( $ta['name'] ?? '' ),

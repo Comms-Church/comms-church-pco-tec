@@ -138,12 +138,14 @@ class CCTEC_API {
     }
 
     /**
-     * Fetch all signups that have a linked PCO Calendar event, paginated.
-     * Used for Registrations-only mode — only signups with a calendar event
-     * get synced to TEC.
+     * Fetch all unarchived signups with their next SignupTime and location included.
+     * Used for Registrations-only mode.
+     *
+     * Dates live on SignupTime resources (relationships.next_signup_time), NOT on
+     * the Calendar API. The Registrations API is self-contained.
      *
      * @param int $max_pages
-     * @return array  Flat array of signup resource objects with _calendar_event attached.
+     * @return array  Flat array of signup resource objects with _next_time and _location attached.
      */
     public function get_all_registration_instances( int $max_pages = 20 ): array {
         $results = [];
@@ -156,7 +158,7 @@ class CCTEC_API {
                 'per_page' => $per,
                 'offset'   => $offset,
                 'filter'   => 'unarchived',
-                'include'  => 'event',
+                'include'  => 'next_signup_time,signup_location',
             ] );
             if ( is_wp_error( $body ) ) break;
 
@@ -164,24 +166,21 @@ class CCTEC_API {
             $included = $body['included'] ?? [];
             $total    = $body['meta']['total_count'] ?? count( $data );
 
-            $included_index = $this->index_included( $included );
+            $times_map    = $this->build_map( $included, 'SignupTime' );
+            $location_map = $this->build_map( $included, 'SignupLocation' );
 
             foreach ( $data as &$signup ) {
-                // Only include signups that are linked to a calendar event.
-                $cal_event_id = $signup['relationships']['event']['data']['id'] ?? '';
-                if ( ! $cal_event_id ) continue;
+                // Attach next signup time (carries starts_at, ends_at, all_day).
+                $time_rel = $signup['relationships']['next_signup_time']['data'] ?? null;
+                $signup['_next_time'] = $time_rel ? ( $times_map[ $time_rel['id'] ] ?? null ) : null;
 
-                $cal_event = $included_index['Event'][ $cal_event_id ] ?? null;
-                if ( ! $cal_event ) {
-                    // Fetch the calendar event directly if not included.
-                    $fetched   = $this->get_event( $cal_event_id );
-                    $cal_event = is_wp_error( $fetched ) ? null : ( $fetched['data'] ?? null );
-                }
+                // Attach location.
+                $loc_rel = $signup['relationships']['signup_location']['data'] ?? null;
+                $signup['_location'] = $loc_rel ? ( $location_map[ $loc_rel['id'] ] ?? null ) : null;
 
-                $signup['_calendar_event'] = $cal_event;
                 $results[] = $signup;
             }
-            unset( $signup, $included_index );
+            unset( $signup );
 
             $offset += $per;
             $page++;
@@ -189,6 +188,20 @@ class CCTEC_API {
         } while ( count( $results ) < $total && $page < $max_pages );
 
         return $results;
+    }
+
+    /**
+     * Build a map of included resources keyed by ID, filtered by type.
+     * Mirrors the working plugin's build_map() helper.
+     */
+    public function build_map( array $included, string $type ): array {
+        $map = [];
+        foreach ( $included as $item ) {
+            if ( ( $item['type'] ?? '' ) === $type ) {
+                $map[ $item['id'] ] = $item;
+            }
+        }
+        return $map;
     }
 
     public function get_locations( array $args = [] ): array|WP_Error {
