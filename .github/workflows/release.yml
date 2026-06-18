@@ -19,8 +19,8 @@ jobs:
 
       - name: Verify plugin header version matches tag
         run: |
-          HEADER_VERSION=$(grep -m1 "Version:" comms-church-pco.php | sed -E 's/.*Version:\s*//')
-          CONST_VERSION=$(grep -m1 "define( 'CCPCO_VERSION'" comms-church-pco.php | sed -E "s/.*'([0-9.]+)'.*/\1/")
+          HEADER_VERSION=$(grep -m1 "Version:" comms-church-pco-tec.php | sed -E 's/.*Version:\s*//')
+          CONST_VERSION=$(grep -m1 "define( 'CCTEC_VERSION'" comms-church-pco-tec.php | sed -E "s/.*'([0-9.]+)'.*/\1/")
           TAG_VERSION="${{ steps.tag.outputs.version }}"
 
           echo "Tag version:    $TAG_VERSION"
@@ -33,24 +33,24 @@ jobs:
           fi
 
           if [ "$CONST_VERSION" != "$TAG_VERSION" ]; then
-            echo "::error::CCPCO_VERSION constant ($CONST_VERSION) does not match tag ($TAG_VERSION)."
+            echo "::error::CCTEC_VERSION constant ($CONST_VERSION) does not match tag ($TAG_VERSION)."
             exit 1
           fi
 
       - name: Build plugin zip
         run: |
-          mkdir -p build/comms-church-pco
+          mkdir -p build/comms-church-pco-tec
           rsync -a --exclude='.git' --exclude='.github' --exclude='build' --exclude='.gitignore' \
-            ./ build/comms-church-pco/
+            ./ build/comms-church-pco-tec/
           cd build
-          zip -r comms-church-pco.zip comms-church-pco
+          zip -r comms-church-pco-tec.zip comms-church-pco-tec
           cd ..
-          mv build/comms-church-pco.zip comms-church-pco.zip
+          mv build/comms-church-pco-tec.zip comms-church-pco-tec.zip
 
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
-          files: comms-church-pco.zip
+          files: comms-church-pco-tec.zip
           generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
