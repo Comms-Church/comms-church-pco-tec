@@ -137,8 +137,9 @@ class CCTEC_API {
         $page    = 0;
 
         do {
-            $params = [ 'per_page' => $per, 'offset' => $offset, 'include' => 'event,location' ];
-            if ( $after ) $params['filter'] = 'future'; // PCO calendar supports 'future' instance filter
+            // Always filter to future instances to avoid loading all historical data.
+            $params = [ 'per_page' => $per, 'offset' => $offset, 'include' => 'event,location', 'filter' => 'future' ];
+            if ( $after ) $params['after'] = $after;
 
             $body = $this->get( self::CALENDAR_BASE, '/event_instances', $params );
             if ( is_wp_error( $body ) ) break;
@@ -147,11 +148,14 @@ class CCTEC_API {
             $included = $body['included'] ?? [];
             $total    = $body['meta']['total_count'] ?? count( $data );
 
-            // Index included resources so the sync engine can do fast lookups
+            // Index included resources ONCE per page, then attach a lightweight
+            // reference key so sync can look up event/location without duplicating
+            // the full included blob onto every instance (which exhausts memory).
+            $included_index = $this->index_included( $included );
             foreach ( $data as &$instance ) {
-                $instance['_included'] = $this->index_included( $included );
+                $instance['_included'] = $included_index;
             }
-            unset( $instance );
+            unset( $instance, $included_index );
 
             $results = array_merge( $results, $data );
             $offset += $per;
