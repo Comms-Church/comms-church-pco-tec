@@ -49,6 +49,10 @@ class CCTEC_Shortcodes {
         add_shortcode( 'pco_register',   [ $this, 'render_register_button' ] );
         add_shortcode( 'pco_event_card', [ $this, 'render_event_card' ] );
         add_action( 'wp_enqueue_scripts', [ $this, 'enqueue_front_assets' ] );
+
+        // Automatically inject the Register button on TEC single event pages,
+        // after the event description and before the Add to Calendar widget.
+        add_action( 'tribe_events_single_event_after_the_content', [ $this, 'inject_register_button' ] );
     }
 
     // ── Asset loading ─────────────────────────────────────────────────────────
@@ -69,6 +73,8 @@ class CCTEC_Shortcodes {
 
     private function page_has_shortcode(): bool {
         global $post;
+        // Also load on TEC single event pages so the injected button is styled.
+        if ( function_exists( 'tribe_is_event' ) && tribe_is_event() ) return true;
         if ( ! is_a( $post, 'WP_Post' ) ) return false;
         return has_shortcode( $post->post_content, 'pco_register' )
             || has_shortcode( $post->post_content, 'pco_event_card' );
@@ -254,6 +260,35 @@ class CCTEC_Shortcodes {
 
         </article>
         <?php return ob_get_clean();
+    }
+
+    // ── Auto-inject on TEC single event pages ────────────────────────────────
+
+    /**
+     * Fires after the event description on TEC single event pages.
+     * Renders a Register Now button only when the event has a PCO registration URL.
+     * Respects the global brand color and a 'disable' option for per-event opt-out.
+     */
+    public function inject_register_button(): void {
+        $post_id = get_the_ID();
+        if ( ! $post_id ) return;
+
+        // Only show on events synced from PCO (have a registration URL).
+        $reg_url = get_post_meta( $post_id, '_pco_registration_url', true );
+        if ( ! $reg_url ) return;
+
+        $color = $this->resolve_color( '' );
+        $label = get_option( 'cctec_register_label', __( 'Register Now', 'comms-church-pco-tec' ) );
+
+        $this->do_enqueue();
+
+        echo '<div class="cctec-single-register">';
+        echo '<a href="' . esc_url( $reg_url ) . '" class="cctec-btn cctec-btn-primary" '
+           . 'style="--cctec-brand:' . esc_attr( $color ) . '" '
+           . 'target="_blank" rel="noopener noreferrer">'
+           . esc_html( $label )
+           . '</a>';
+        echo '</div>';
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────

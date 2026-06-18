@@ -77,6 +77,9 @@ class CCTEC_Admin {
         register_setting( self::OPTION_GROUP, 'cctec_sideload_images', [
             'sanitize_callback' => 'sanitize_text_field',
         ] );
+        register_setting( self::OPTION_GROUP, 'cctec_register_label', [
+            'sanitize_callback' => 'sanitize_text_field',
+        ] );
     }
 
     public function sanitize_sync_source( $v ): string {
@@ -304,6 +307,15 @@ class CCTEC_Admin {
                                     <?php esc_html_e( 'Pull event images from PCO and save as WordPress featured images', 'comms-church-pco-tec' ); ?>
                                 </label>
                                 <p class="description"><?php esc_html_e( 'Images are only downloaded when a new or changed image URL is detected — not on every sync. Old images are cleaned from the media library automatically.', 'comms-church-pco-tec' ); ?></p>
+                            </td>
+                        </tr>
+                        <tr>
+                            <th><label for="cctec_register_label"><?php esc_html_e( 'Register Button Label', 'comms-church-pco-tec' ); ?></label></th>
+                            <td>
+                                <input type="text" id="cctec_register_label" name="cctec_register_label"
+                                       value="<?php echo esc_attr( get_option( 'cctec_register_label', __( 'Register Now', 'comms-church-pco-tec' ) ) ); ?>"
+                                       class="regular-text" placeholder="Register Now">
+                                <p class="description"><?php esc_html_e( 'Text shown on the auto-injected button on TEC event pages and the [pco_register] shortcode default.', 'comms-church-pco-tec' ); ?></p>
                             </td>
                         </tr>
                     </table>
