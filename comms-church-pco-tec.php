@@ -3,7 +3,7 @@
  * Plugin Name: Comms.Church — PCO Events → The Events Calendar
  * Plugin URI:  https://comms.church
  * Description: Syncs Planning Center Events (and optional Registrations signup links) into The Events Calendar. Automatic scheduled sync + manual trigger. API credentials stored securely server-side.
- * Version:     1.1.0
+ * Version:     1.2.0
  * Author:      Comms.Church
  * Author URI:  https://comms.church
  * License:     GPL-2.0+
@@ -14,7 +14,7 @@
 
 if ( ! defined( 'ABSPATH' ) ) exit;
 
-define( 'CCTEC_VERSION',     '1.1.0' );
+define( 'CCTEC_VERSION',     '1.2.0' );
 define( 'CCTEC_PLUGIN_DIR',  plugin_dir_path( __FILE__ ) );
 define( 'CCTEC_PLUGIN_URL',  plugin_dir_url( __FILE__ ) );
 define( 'CCTEC_PLUGIN_FILE', __FILE__ );
@@ -37,7 +37,9 @@ class CCTEC {
         // Load includes
         require_once CCTEC_PLUGIN_DIR . 'includes/class-cctec-api.php';
         require_once CCTEC_PLUGIN_DIR . 'includes/class-cctec-cache.php';
+        require_once CCTEC_PLUGIN_DIR . 'includes/class-cctec-images.php';
         require_once CCTEC_PLUGIN_DIR . 'includes/class-cctec-sync.php';
+        require_once CCTEC_PLUGIN_DIR . 'includes/class-cctec-shortcodes.php';
         require_once CCTEC_PLUGIN_DIR . 'includes/class-cctec-admin.php';
 
         if ( is_admin() ) {
@@ -47,6 +49,7 @@ class CCTEC {
         // Initialise
         new CCTEC_Admin();
         new CCTEC_Sync(); // registers cron hooks
+        new CCTEC_Shortcodes();
 
         if ( is_admin() ) {
             new CCTEC_Updater( CCTEC_PLUGIN_FILE, CCTEC_VERSION );
@@ -78,6 +81,12 @@ class CCTEC {
         }
         if ( false === get_option( 'cctec_cache_ttl' ) ) {
             update_option( 'cctec_cache_ttl', 300 );
+        }
+        if ( false === get_option( 'cctec_brand_color' ) ) {
+            update_option( 'cctec_brand_color', '#1a4a8a' );
+        }
+        if ( false === get_option( 'cctec_sideload_images' ) ) {
+            update_option( 'cctec_sideload_images', '1' );
         }
     }
 

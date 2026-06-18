@@ -277,6 +277,14 @@ class CCTEC_Sync {
         // Store a special meta key so delete_stale can find signup-mode posts.
         update_post_meta( $post_id, '_pco_signup_id', 'signup_' . $signup_id );
 
+        // ── Sideload image if enabled ──────────────────────────────────────
+        if ( get_option( 'cctec_sideload_images', '1' ) === '1' ) {
+            $image_url = CCTEC_Images::url_from_signup( $attrs );
+            if ( $image_url ) {
+                CCTEC_Images::maybe_sideload( $post_id, $image_url, $name );
+            }
+        }
+
         $this->log( 'info', "{$action} TEC post {$post_id} ← PCO signup {$signup_id} ({$name})." );
         return $action;
     }
@@ -429,6 +437,14 @@ class CCTEC_Sync {
             update_post_meta( $post_id, '_pco_min_price',        $signup_data['min_price'] );
             update_post_meta( $post_id, '_pco_max_price',        $signup_data['max_price'] );
             update_post_meta( $post_id, '_pco_ticket_types',     wp_json_encode( $signup_data['ticket_types'] ) );
+        }
+
+        // ── Sideload image if enabled ──────────────────────────────────────
+        if ( get_option( 'cctec_sideload_images', '1' ) === '1' ) {
+            $image_url = CCTEC_Images::url_from_calendar_event( $event_attrs );
+            if ( $image_url ) {
+                CCTEC_Images::maybe_sideload( $post_id, $image_url, $name );
+            }
         }
 
         $series_note = $is_recurring ? " [series #{$series_index}]" : '';

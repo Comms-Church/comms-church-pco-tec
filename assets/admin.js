@@ -15,6 +15,24 @@
                 e.preventDefault();
             }
         });
+
+        // Keep brand color picker and hex text input in sync
+        var $picker = $('#cctec_brand_color');
+        var $hex    = $('#cctec_brand_color_hex');
+        if ($picker.length && $hex.length) {
+            $picker.on('input', function () { $hex.val($picker.val()); });
+            $hex.on('input', function () {
+                if (/^#[0-9a-fA-F]{6}$/.test($hex.val())) {
+                    $picker.val($hex.val());
+                    // Keep both inputs submitting the same name
+                    $picker.attr('name', '');
+                    $hex.attr('name', 'cctec_brand_color');
+                }
+            });
+            // On load, ensure the hex field is the one that submits
+            $picker.attr('name', '');
+            $hex.attr('name', 'cctec_brand_color');
+        }
     });
 
 }(jQuery));

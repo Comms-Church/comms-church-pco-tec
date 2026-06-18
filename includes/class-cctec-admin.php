@@ -69,6 +69,14 @@ class CCTEC_Admin {
         register_setting( self::OPTION_GROUP, 'cctec_cache_ttl', [
             'sanitize_callback' => function( $v ) { return max( 60, intval( $v ) ); },
         ] );
+
+        // ── Display / branding ───────────────────────────────────────────
+        register_setting( self::OPTION_GROUP, 'cctec_brand_color', [
+            'sanitize_callback' => 'sanitize_hex_color',
+        ] );
+        register_setting( self::OPTION_GROUP, 'cctec_sideload_images', [
+            'sanitize_callback' => 'sanitize_text_field',
+        ] );
     }
 
     public function sanitize_sync_source( $v ): string {
@@ -271,7 +279,37 @@ class CCTEC_Admin {
                     </table>
                 </div>
 
-                <?php /* ── 4. Cache ── */ ?>
+                <?php /* ── 4. Display & Branding ── */ ?>
+                <div class="cctec-card">
+                    <h2><?php esc_html_e( 'Display &amp; Branding', 'comms-church-pco-tec' ); ?></h2>
+                    <p><?php esc_html_e( 'Controls how events look when displayed via the [pco_register] and [pco_event_card] shortcodes.', 'comms-church-pco-tec' ); ?></p>
+                    <table class="form-table">
+                        <tr>
+                            <th><label for="cctec_brand_color"><?php esc_html_e( 'Brand Color', 'comms-church-pco-tec' ); ?></label></th>
+                            <td>
+                                <input type="color" id="cctec_brand_color" name="cctec_brand_color"
+                                       value="<?php echo esc_attr( get_option( 'cctec_brand_color', '#1a4a8a' ) ); ?>">
+                                <input type="text"  id="cctec_brand_color_hex" style="width:90px;margin-left:8px"
+                                       value="<?php echo esc_attr( get_option( 'cctec_brand_color', '#1a4a8a' ) ); ?>"
+                                       pattern="^#[0-9a-fA-F]{6}$" placeholder="#1a4a8a">
+                                <p class="description"><?php esc_html_e( 'Used for Register Now buttons and card accents. Can be overridden per-shortcode with the color="" attribute.', 'comms-church-pco-tec' ); ?></p>
+                            </td>
+                        </tr>
+                        <tr>
+                            <th><?php esc_html_e( 'Event Images', 'comms-church-pco-tec' ); ?></th>
+                            <td>
+                                <label>
+                                    <input type="checkbox" name="cctec_sideload_images" value="1"
+                                           <?php checked( get_option( 'cctec_sideload_images', '1' ), '1' ); ?>>
+                                    <?php esc_html_e( 'Pull event images from PCO and save as WordPress featured images', 'comms-church-pco-tec' ); ?>
+                                </label>
+                                <p class="description"><?php esc_html_e( 'Images are only downloaded when a new or changed image URL is detected — not on every sync. Old images are cleaned from the media library automatically.', 'comms-church-pco-tec' ); ?></p>
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+
+                <?php /* ── 5. Cache ── */ ?>
                 <div class="cctec-card">
                     <h2><?php esc_html_e( 'Cache', 'comms-church-pco-tec' ); ?></h2>
                     <table class="form-table">
