@@ -1,0 +1,56 @@
+name: Release Plugin
+
+on:
+  push:
+    tags:
+      - 'v*'
+permissions:
+  contents: write
+jobs:
+  build-and-release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Extract tag version
+        id: tag
+        run: echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+
+      - name: Verify plugin header version matches tag
+        run: |
+          HEADER_VERSION=$(grep -m1 "Version:" comms-church-pco.php | sed -E 's/.*Version:\s*//')
+          CONST_VERSION=$(grep -m1 "define( 'CCPCO_VERSION'" comms-church-pco.php | sed -E "s/.*'([0-9.]+)'.*/\1/")
+          TAG_VERSION="${{ steps.tag.outputs.version }}"
+
+          echo "Tag version:    $TAG_VERSION"
+          echo "Header version: $HEADER_VERSION"
+          echo "Const version:  $CONST_VERSION"
+
+          if [ "$HEADER_VERSION" != "$TAG_VERSION" ]; then
+            echo "::error::Plugin header Version ($HEADER_VERSION) does not match tag ($TAG_VERSION)."
+            exit 1
+          fi
+
+          if [ "$CONST_VERSION" != "$TAG_VERSION" ]; then
+            echo "::error::CCPCO_VERSION constant ($CONST_VERSION) does not match tag ($TAG_VERSION)."
+            exit 1
+          fi
+
+      - name: Build plugin zip
+        run: |
+          mkdir -p build/comms-church-pco
+          rsync -a --exclude='.git' --exclude='.github' --exclude='build' --exclude='.gitignore' \
+            ./ build/comms-church-pco/
+          cd build
+          zip -r comms-church-pco.zip comms-church-pco
+          cd ..
+          mv build/comms-church-pco.zip comms-church-pco.zip
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: comms-church-pco.zip
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -1,0 +1,93 @@
+/* comms-church-pco-tec — admin.css */
+
+.cctec-wrap h1 {
+    margin-bottom: 4px;
+}
+
+/* ── Status bar ─────────────────────────────────────────────────────────── */
+.cctec-status-bar {
+    display: flex;
+    gap: 20px;
+    align-items: center;
+    background: #fff;
+    border: 1px solid #c3c4c7;
+    border-radius: 4px;
+    padding: 10px 16px;
+    margin: 12px 0 20px;
+    font-size: 13px;
+    flex-wrap: wrap;
+}
+
+.cctec-api-status {
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 3px;
+}
+
+.cctec-api-status.ok  { background: #d4edda; color: #155724; }
+.cctec-api-status.err { background: #f8d7da; color: #721c24; }
+
+/* ── Cards ───────────────────────────────────────────────────────────────── */
+.cctec-card {
+    background: #fff;
+    border: 1px solid #c3c4c7;
+    border-radius: 4px;
+    padding: 20px 24px 8px;
+    margin-bottom: 20px;
+}
+
+.cctec-card h2 {
+    margin-top: 0;
+    margin-bottom: 12px;
+    font-size: 14px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: .05em;
+    color: #1d2327;
+    border-bottom: 1px solid #f0f0f0;
+    padding-bottom: 8px;
+}
+
+/* ── Sync Log ────────────────────────────────────────────────────────────── */
+.cctec-log-table {
+    margin-top: 8px;
+    font-size: 12px;
+    font-family: monospace;
+}
+
+.cctec-log-table td:first-child {
+    white-space: nowrap;
+    width: 160px;
+    color: #646970;
+}
+
+.cctec-log-table td:nth-child(2) {
+    width: 60px;
+    font-weight: 600;
+    text-transform: uppercase;
+}
+
+.cctec-log-error   td:nth-child(2) { color: #b32d2e; }
+.cctec-log-info    td:nth-child(2) { color: #135e96; }
+
+/* ── TEC event meta box ──────────────────────────────────────────────────── */
+.cctec-event-meta-box {
+    background: #f6f7f7;
+    border-left: 4px solid #2271b1;
+    padding: 12px 14px;
+    margin: 12px 0;
+    border-radius: 0 3px 3px 0;
+    font-size: 13px;
+}
+
+.cctec-event-meta-box h4 {
+    margin: 0 0 8px;
+    font-size: 13px;
+    font-weight: 600;
+    color: #2271b1;
+}
+
+.cctec-event-meta-box p {
+    margin: 4px 0;
+    color: #3c434a;
+}
