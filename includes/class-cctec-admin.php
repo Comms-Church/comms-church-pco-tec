@@ -99,15 +99,6 @@ class CCTEC_Admin {
     public function handle_actions(): void {
         if ( ! current_user_can( 'manage_options' ) ) return;
 
-        // Register custom cron interval
-        add_filter( 'cron_schedules', function( $schedules ) {
-            $schedules['cctec_every_6_hours'] = [
-                'interval' => 6 * HOUR_IN_SECONDS,
-                'display'  => __( 'Every 6 hours', 'comms-church-pco-tec' ),
-            ];
-            return $schedules;
-        } );
-
         if ( empty( $_POST['cctec_action'] ) ) return;
         if ( ! isset( $_POST['_wpnonce'] ) || ! wp_verify_nonce( $_POST['_wpnonce'], 'cctec_action' ) ) return;
 
