@@ -75,10 +75,13 @@ comms-church-pco-tec/
 
 ## Releasing a New Version
 
+In Claude Code, say **"cut a release"** (or `/release`, optionally `minor` / `major` / an explicit version). The skill in `.claude/skills/release/` lints all PHP, bumps the version in both places, commits, tags `vX.Y.Z`, pushes, and verifies the GitHub release went live.
+
+Manual equivalent:
+
 1. Bump `Version:` in the plugin header and `CCTEC_VERSION` constant in `comms-church-pco-tec.php` (both must match the git tag).
-2. Commit and push.
-3. Create a GitHub Release with a tag like `v1.1.0`.
-4. GitHub Actions builds and attaches `comms-church-pco-tec.zip` to the release. Sites will see the update in **Plugins → Updates** within 24 hours (or immediately via the "Check for updates" link).
+2. Commit, tag `vX.Y.Z`, and push with `--tags`.
+3. GitHub Actions builds and attaches `comms-church-pco-tec.zip` to a new Release automatically. Sites will see the update in **Plugins → Updates** within 24 hours (or immediately via the "Check for updates" link).
 
 ## Forked From
 

@@ -40,7 +40,8 @@ jobs:
       - name: Build plugin zip
         run: |
           mkdir -p build/comms-church-pco-tec
-          rsync -a --exclude='.git' --exclude='.github' --exclude='build' --exclude='.gitignore' \
+          rsync -a --exclude='.git' --exclude='.github' --exclude='.claude' --exclude='build' \
+            --exclude='.gitignore' --exclude='.gitattributes' --exclude='.DS_Store' \
             ./ build/comms-church-pco-tec/
           cd build
           zip -r comms-church-pco-tec.zip comms-church-pco-tec
