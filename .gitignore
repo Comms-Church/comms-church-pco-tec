@@ -1,0 +1,25 @@
+# OS files
+.DS_Store
+Thumbs.db
+
+# Editor
+.idea/
+.vscode/
+*.sublime-*
+
+# Build artifacts
+build/
+*.zip
+
+# Dependencies
+node_modules/
+vendor/
+
+# Test tooling artifacts
+test-results/
+playwright-report/
+screenshots/
+
+# Logs
+*.log
+npm-debug.log*

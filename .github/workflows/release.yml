@@ -42,6 +42,9 @@ jobs:
           mkdir -p build/comms-church-pco-tec
           rsync -a --exclude='.git' --exclude='.github' --exclude='.claude' --exclude='build' \
             --exclude='.gitignore' --exclude='.gitattributes' --exclude='.DS_Store' \
+            --exclude='node_modules' --exclude='tests' --exclude='test-results' \
+            --exclude='playwright-report' --exclude='screenshots' --exclude='package.json' \
+            --exclude='package-lock.json' --exclude='playwright.config.js' \
             ./ build/comms-church-pco-tec/
           cd build
           zip -r comms-church-pco-tec.zip comms-church-pco-tec

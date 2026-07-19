@@ -1,0 +1,16 @@
+{
+  "$schema": "https://playground.wordpress.net/blueprint-schema.json",
+  "steps": [
+    {
+      "step": "installPlugin",
+      "pluginData": {
+        "resource": "wordpress.org/plugins",
+        "slug": "the-events-calendar"
+      }
+    },
+    {
+      "step": "runPHP",
+      "code": "<?php require_once '/wordpress/wp-load.php'; if ( ! function_exists( 'tribe_create_event' ) ) { throw new Exception( 'The Events Calendar did not load — cannot seed events.' ); } tribe_update_option( 'tec_events_onboarding_page_dismissed', true ); tribe_update_option( 'tec_onboarding_wizard_visited_guided_setup', true ); update_option( 'tec_onboarding_wizard_data', [ 'finished' => true ] ); delete_transient( '_tribe_events_activation_redirect' ); $existing = get_posts([ 'post_type' => 'tribe_events', 'post_status' => 'publish', 'numberposts' => 1 ]); if ( $existing ) { return; } foreach ( [ [ 'Youth Group Kickoff', '+7 days 18:00', '+7 days 20:00', 'pco-evt-1001' ], [ 'Fall Marriage Retreat', '+21 days 09:00', '+21 days 16:00', 'pco-evt-1002' ] ] as $e ) { $id = tribe_create_event([ 'post_title' => $e[0], 'post_status' => 'publish', 'post_content' => 'Seeded by the release smoke suite.', 'EventStartDate' => date( 'Y-m-d', strtotime( $e[1] ) ), 'EventStartHour' => date( 'H', strtotime( $e[1] ) ), 'EventStartMinute' => date( 'i', strtotime( $e[1] ) ), 'EventEndDate' => date( 'Y-m-d', strtotime( $e[2] ) ), 'EventEndHour' => date( 'H', strtotime( $e[2] ) ), 'EventEndMinute' => date( 'i', strtotime( $e[2] ) ) ]); if ( $id ) { update_post_meta( $id, '_cctec_pco_event_id', $e[3] ); } } flush_rewrite_rules();"
+    }
+  ]
+}
