@@ -2,6 +2,9 @@
 // session for the smoke + screenshot projects.
 const { test: setup, expect } = require('@playwright/test');
 
+// Events created by tests/blueprint.json.
+const SEEDED_EVENTS = 2;
+
 setup('authenticate as admin', async ({ page }) => {
   await page.goto('/wp-admin/');
 
@@ -35,18 +38,34 @@ setup('authenticate as admin', async ({ page }) => {
   await page.context().storageState({ path: 'test-results/.auth/admin.json' });
 });
 
-setup('warm up The Events Calendar', async ({ request }) => {
-  // TEC finishes registering REST routes / syncing its custom event tables
-  // shortly after first boot — poll until the seeded events are visible so
-  // the smoke tests start from a deterministic state.
-  setup.setTimeout(90_000);
-  for (let i = 0; i < 30; i++) {
-    const res = await request.get('/wp-json/tribe/events/v1/events').catch(() => null);
-    if (res && res.status() === 200) {
-      const data = await res.json().catch(() => ({}));
-      if ((data.events || []).length >= 2) return;
-    }
+async function waitFor(check, what) {
+  for (let i = 0; i < 45; i++) {
+    if (await check().catch(() => false)) return;
     await new Promise((r) => setTimeout(r, 2000));
   }
-  throw new Error('Seeded TEC events never appeared via REST — check tests/blueprint.json seeding.');
+  throw new Error(`${what} never became ready — check tests/blueprint.json seeding.`);
+}
+
+setup('warm up The Events Calendar', async ({ browser, request }) => {
+  // Playground reports "Ready" (and /wp-json/ answers) several seconds before
+  // TEC has bootstrapped: during that window tribe_events isn't registered, so
+  // the TEC REST routes 404 and edit.php?post_type=tribe_events dies with
+  // "Invalid post type." Gate the smoke project on TEC actually serving the
+  // seeded events, over REST and in the admin list table, so no test runs
+  // inside that window.
+  setup.setTimeout(240_000);
+
+  await waitFor(async () => {
+    const res = await request.get('/wp-json/tribe/events/v1/events');
+    if (res.status() !== 200) return false;
+    return ((await res.json()).events || []).length >= SEEDED_EVENTS;
+  }, 'TEC REST events endpoint');
+
+  const context = await browser.newContext({ storageState: 'test-results/.auth/admin.json' });
+  const page = await context.newPage();
+  await waitFor(async () => {
+    await page.goto('/wp-admin/edit.php?post_type=tribe_events');
+    return (await page.locator('#the-list a.row-title').count()) >= SEEDED_EVENTS;
+  }, 'TEC admin events list');
+  await context.close();
 });
