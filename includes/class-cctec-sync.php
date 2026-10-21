@@ -29,7 +29,8 @@
  *  _pco_min_price         float|null
  *  _pco_max_price         float|null
  *  _pco_ticket_types      string   JSON [{name, price, capacity}]
- *  _pco_updated_at        string   ISO8601 — change-detection sentinel
+ *  _pco_updated_at        string   ISO8601 from PCO (informational)
+ *  _pco_fingerprint       string   md5 of every PCO field we write — change detection
  *  _pco_synced            int      Unix timestamp of last sync write
  *  _pco_is_recurring      int      1 if part of a series
  *  _pco_series_index      int      0-based position in series
@@ -82,6 +83,10 @@ class CCTEC_Sync {
             $this->log( 'error', 'Sync skipped — API credentials not configured.' );
             return [ 'created' => 0, 'updated' => 0, 'deleted' => 0, 'errors' => 1 ];
         }
+
+        // A first sync (or the first after an upgrade adds a new fingerprint field)
+        // writes every event and can run well past a host's 30s default.
+        if ( function_exists( 'set_time_limit' ) ) @set_time_limit( 0 );
 
         $source = get_option( 'cctec_sync_source', 'registrations_only' );
         $this->log( 'info', "Sync started (mode: {$source}, force: " . ( $force ? 'yes' : 'no' ) . ').' );
@@ -213,9 +218,16 @@ class CCTEC_Sync {
         // Lookup existing post.
         $existing_id = $this->find_post_by_meta( '_pco_registration_id', $signup_id );
 
+        // Dates live on a separate SignupTime resource, so the signup's own
+        // updated_at doesn't move when only the date changes.
+        $fingerprint = $this->fingerprint( [
+            $updated_at, $name, $description, $starts_at, $ends_at, $all_day, $reg_url,
+            $signup['_location']['id'] ?? '', $loc_attrs,
+        ] );
+
         // Change detection — skip early before any extra API calls.
         if ( $existing_id && ! $force ) {
-            if ( get_post_meta( $existing_id, '_pco_updated_at', true ) === $updated_at ) {
+            if ( get_post_meta( $existing_id, '_pco_fingerprint', true ) === $fingerprint ) {
                 return 'noop';
             }
         }
@@ -253,6 +265,7 @@ class CCTEC_Sync {
         update_post_meta( $post_id, '_pco_max_price',        $ticket_data['max_price'] );
         update_post_meta( $post_id, '_pco_ticket_types',     wp_json_encode( $ticket_data['types'] ) );
         update_post_meta( $post_id, '_pco_updated_at',       $updated_at );
+        update_post_meta( $post_id, '_pco_fingerprint',      $fingerprint );
         update_post_meta( $post_id, '_pco_synced',           time() );
 
         $this->maybe_sideload_image( $post_id, $name,
@@ -306,12 +319,26 @@ class CCTEC_Sync {
         $start_date = $this->iso_to_local( $starts_at );
         $end_date   = $ends_at ? $this->iso_to_local( $ends_at ) : $start_date;
 
+        $loc_id = $instance['relationships']['location']['data']['id']
+               ?? $event_res['relationships']['location']['data']['id']
+               ?? '';
+
+        $matched_signup = $signup_map[ strtolower( trim( $name ) ) ] ?? null;
+
         // Lookup existing post.
         $existing_id = $this->find_post_by_meta( '_pco_instance_id', $instance_id );
 
+        // Name and description live on the parent Event, so the instance's own
+        // updated_at doesn't move when only those change.
+        $fingerprint = $this->fingerprint( [
+            $updated_at, $name, $description, $starts_at, $ends_at, $all_day, $pco_url,
+            $loc_id, $included['Location'][ $loc_id ]['attributes'] ?? [],
+            $matched_signup['id'] ?? '', $matched_signup['attributes']['updated_at'] ?? '',
+        ] );
+
         // Change detection.
         if ( $existing_id && ! $force ) {
-            if ( get_post_meta( $existing_id, '_pco_updated_at', true ) === $updated_at ) {
+            if ( get_post_meta( $existing_id, '_pco_fingerprint', true ) === $fingerprint ) {
                 return 'noop';
             }
             // Conflict strategy.
@@ -325,9 +352,6 @@ class CCTEC_Sync {
 
         // Venue.
         $venue_id = 0;
-        $loc_id   = $instance['relationships']['location']['data']['id']
-                 ?? $event_res['relationships']['location']['data']['id']
-                 ?? '';
         if ( $loc_id && isset( $included['Location'][ $loc_id ] ) ) {
             $venue_id = $this->get_or_create_venue( $included['Location'][ $loc_id ] );
         }
@@ -337,21 +361,17 @@ class CCTEC_Sync {
         $min_price = null;
         $max_price = null;
         $ticket_types = [];
-        if ( $signup_map ) {
-            $lookup = strtolower( trim( $name ) );
-            if ( isset( $signup_map[ $lookup ] ) ) {
-                $matched_signup = $signup_map[ $lookup ];
-                $sig_reg_url    = $matched_signup['attributes']['new_registration_url']
-                               ?? $matched_signup['attributes']['registration_url']
-                               ?? $matched_signup['attributes']['public_url']
-                               ?? '';
-                if ( $sig_reg_url ) $reg_url = esc_url_raw( $sig_reg_url );
+        if ( $matched_signup ) {
+            $sig_reg_url = $matched_signup['attributes']['new_registration_url']
+                        ?? $matched_signup['attributes']['registration_url']
+                        ?? $matched_signup['attributes']['public_url']
+                        ?? '';
+            if ( $sig_reg_url ) $reg_url = esc_url_raw( $sig_reg_url );
 
-                $td = $this->fetch_ticket_data( (int) $matched_signup['id'] );
-                $min_price    = $td['min_price'];
-                $max_price    = $td['max_price'];
-                $ticket_types = $td['types'];
-            }
+            $td = $this->fetch_ticket_data( (int) $matched_signup['id'] );
+            $min_price    = $td['min_price'];
+            $max_price    = $td['max_price'];
+            $ticket_types = $td['types'];
         }
 
         $event_args = array_merge( [
@@ -371,6 +391,7 @@ class CCTEC_Sync {
         update_post_meta( $post_id, '_pco_event_id',          $event_id );
         update_post_meta( $post_id, '_pco_instance_id',       $instance_id );
         update_post_meta( $post_id, '_pco_updated_at',        $updated_at );
+        update_post_meta( $post_id, '_pco_fingerprint',       $fingerprint );
         update_post_meta( $post_id, '_pco_synced',            time() );
         update_post_meta( $post_id, '_pco_is_recurring',      $is_recurring ? 1 : 0 );
         update_post_meta( $post_id, '_pco_series_index',      $series_index );
@@ -410,11 +431,20 @@ class CCTEC_Sync {
         }
 
         if ( is_wp_error( $post_id ) || ! $post_id ) {
-            return [ new WP_Error( 'cctec_tec_write_fail',
-                "Failed to {$action} TEC event for PCO ref {$ref_id}." ), '' ];
+            $verb = $existing_id ? 'update' : 'create';
+            return [ new WP_Error( 'cctec_tec_write_fail', sprintf(
+                'Failed to %s TEC event for PCO ref %s (%s, %s %s:%s %s).',
+                $verb, $ref_id, $event_args['post_title'] ?? '',
+                $event_args['EventStartDate'] ?? '', $event_args['EventStartHour'] ?? '',
+                $event_args['EventStartMinute'] ?? '', $event_args['EventStartMeridian'] ?? ''
+            ) ), '' ];
         }
 
         return [ (int) $post_id, $action ];
+    }
+
+    private function fingerprint( array $parts ): string {
+        return md5( (string) wp_json_encode( $parts ) );
     }
 
     /**
@@ -579,6 +609,8 @@ class CCTEC_Sync {
     /**
      * Build the complete set of date/time args that tribe_create_event() needs.
      * Without the split Hour/Minute/Meridian fields, TEC silently drops the time.
+     * Hours must be 12-hour ('g') because a Meridian is sent: TEC rejects
+     * hour 0 + 'am', which is how every PCO all-day event starts.
      */
     private function date_args( string $start, string $end ): array {
         if ( ! $start ) return [];
@@ -592,11 +624,11 @@ class CCTEC_Sync {
         }
         return [
             'EventStartDate'     => $s->format( 'Y-m-d' ),
-            'EventStartHour'     => $s->format( 'G' ),
+            'EventStartHour'     => $s->format( 'g' ),
             'EventStartMinute'   => $s->format( 'i' ),
             'EventStartMeridian' => $s->format( 'a' ),
             'EventEndDate'       => $e->format( 'Y-m-d' ),
-            'EventEndHour'       => $e->format( 'G' ),
+            'EventEndHour'       => $e->format( 'g' ),
             'EventEndMinute'     => $e->format( 'i' ),
             'EventEndMeridian'   => $e->format( 'a' ),
         ];

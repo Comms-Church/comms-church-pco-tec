@@ -94,10 +94,13 @@ class CCTEC_API {
      * Fetch all future event_instances, paginated. Used for Calendar and Both modes.
      * Builds included index once per page to avoid memory explosion.
      *
+     * Returns WP_Error if any page fails or the feed is larger than the safety cap.
+     * A partial list must never reach the sync: anything missing from it gets trashed.
+     *
      * @param int $max_pages  Safety cap.
-     * @return array  Flat array of event_instance resource objects.
+     * @return array|WP_Error  Flat array of event_instance resource objects.
      */
-    public function get_all_event_instances( int $max_pages = 20 ): array {
+    public function get_all_event_instances( int $max_pages = 100 ): array|WP_Error {
         $results = [];
         $offset  = 0;
         $per     = 100;
@@ -113,7 +116,7 @@ class CCTEC_API {
             ];
 
             $body = $this->get( self::CALENDAR_BASE, '/event_instances', $params );
-            if ( is_wp_error( $body ) ) break;
+            if ( is_wp_error( $body ) ) return $body;
 
             $data     = $body['data']     ?? [];
             $included = $body['included'] ?? [];
@@ -132,9 +135,9 @@ class CCTEC_API {
             $offset += $per;
             $page++;
 
-        } while ( count( $results ) < $total && $page < $max_pages );
+        } while ( $data && count( $results ) < $total && $page < $max_pages );
 
-        return $results;
+        return $this->complete_or_error( $results, $total );
     }
 
     /**
@@ -144,10 +147,12 @@ class CCTEC_API {
      * Dates live on SignupTime resources (relationships.next_signup_time), NOT on
      * the Calendar API. The Registrations API is self-contained.
      *
+     * Same all-or-error contract as get_all_event_instances().
+     *
      * @param int $max_pages
-     * @return array  Flat array of signup resource objects with _next_time and _location attached.
+     * @return array|WP_Error  Flat array of signup resource objects with _next_time and _location attached.
      */
-    public function get_all_registration_instances( int $max_pages = 20 ): array {
+    public function get_all_registration_instances( int $max_pages = 100 ): array|WP_Error {
         $results = [];
         $offset  = 0;
         $per     = 100;
@@ -160,7 +165,7 @@ class CCTEC_API {
                 'filter'   => 'unarchived',
                 'include'  => 'next_signup_time,signup_location',
             ] );
-            if ( is_wp_error( $body ) ) break;
+            if ( is_wp_error( $body ) ) return $body;
 
             $data     = $body['data']     ?? [];
             $included = $body['included'] ?? [];
@@ -185,8 +190,19 @@ class CCTEC_API {
             $offset += $per;
             $page++;
 
-        } while ( count( $results ) < $total && $page < $max_pages );
+        } while ( $data && count( $results ) < $total && $page < $max_pages );
 
+        return $this->complete_or_error( $results, $total );
+    }
+
+    private function complete_or_error( array $results, int $total ): array|WP_Error {
+        if ( count( $results ) < $total ) {
+            return new WP_Error( 'cctec_feed_incomplete', sprintf(
+                /* translators: 1: items fetched, 2: items Planning Center reported */
+                __( 'Planning Center returned %1$d of %2$d items. Sync aborted so no events are removed by mistake.', 'comms-church-pco-tec' ),
+                count( $results ), $total
+            ) );
+        }
         return $results;
     }
 

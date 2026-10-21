@@ -49,7 +49,8 @@ Create a Personal Access Token at [api.planningcenteronline.com/oauth/applicatio
 |---|---|
 | `_pco_event_id` | PCO Calendar event ID |
 | `_pco_instance_id` | PCO event_instance ID (used to detect deletes) |
-| `_pco_updated_at` | ISO8601 — change detection sentinel |
+| `_pco_updated_at` | ISO8601 `updated_at` from PCO (informational) |
+| `_pco_fingerprint` | Hash of every PCO field the sync writes — change detection. PCO's own `updated_at` misses edits to linked resources (an event's name, a signup's date). |
 | `_pco_synced` | Unix timestamp of last successful sync |
 | `_pco_registration_url` | Direct PCO registration URL (if matched) |
 | `_pco_min_price` | Lowest ticket price in dollars (if matched) |

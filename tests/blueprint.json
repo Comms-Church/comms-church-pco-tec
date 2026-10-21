@@ -16,6 +16,27 @@
     {
       "step": "runPHP",
       "code": "<?php require_once '/wordpress/wp-load.php'; if ( ! function_exists( 'tribe_create_event' ) ) { throw new Exception( 'The Events Calendar did not load — cannot seed events.' ); } $existing = get_posts([ 'post_type' => 'tribe_events', 'post_status' => 'publish', 'numberposts' => 1 ]); if ( $existing ) { return; } foreach ( [ [ 'Youth Group Kickoff', '+7 days 18:00', '+7 days 20:00', 'pco-evt-1001' ], [ 'Fall Marriage Retreat', '+21 days 09:00', '+21 days 16:00', 'pco-evt-1002' ] ] as $e ) { $id = tribe_create_event([ 'post_title' => $e[0], 'post_status' => 'publish', 'post_content' => 'Seeded by the release smoke suite.', 'EventStartDate' => date( 'Y-m-d', strtotime( $e[1] ) ), 'EventStartHour' => date( 'H', strtotime( $e[1] ) ), 'EventStartMinute' => date( 'i', strtotime( $e[1] ) ), 'EventEndDate' => date( 'Y-m-d', strtotime( $e[2] ) ), 'EventEndHour' => date( 'H', strtotime( $e[2] ) ), 'EventEndMinute' => date( 'i', strtotime( $e[2] ) ) ]); if ( $id ) { update_post_meta( $id, '_cctec_pco_event_id', $e[3] ); } } flush_rewrite_rules();"
+    },
+    {
+      "step": "activatePlugin",
+      "pluginPath": "comms-church-pco-tec/comms-church-pco-tec.php"
+    },
+    {
+      "step": "writeFile",
+      "path": "/wordpress/wp-content/mu-plugins/smoke-pco-mock.php",
+      "data": "<?php\n// Smoke-suite fixture: a fake Planning Center, active only while the\n// smoke_pco_mock option exists (the blueprint's sync steps set and then delete it).\n// Instance smoke-1 is all-day, which PCO sends as local midnight → 23:59:59.\nadd_filter( 'pre_http_request', function ( $pre, $args, $url ) {\n    $m = get_option( 'smoke_pco_mock' );\n    if ( ! $m || ! str_contains( $url, 'api.planningcenteronline.com' ) ) return $pre;\n    $tz  = wp_timezone();\n    $iso = fn( string $when ) => ( new DateTimeImmutable( $when, $tz ) )->setTimezone( new DateTimeZone( 'UTC' ) )->format( 'Y-m-d\\TH:i:s\\Z' );\n    $body = (int) $m['status'] !== 200\n        ? [ 'errors' => [ [ 'detail' => 'Invalid credentials' ] ] ]\n        : [\n            'data' => [\n                [ 'id' => 'smoke-1', 'type' => 'EventInstance', 'attributes' => [ 'starts_at' => $iso( '+10 days midnight' ), 'ends_at' => $iso( '+10 days 23:59:59' ), 'updated_at' => 'T1' ], 'relationships' => [ 'event' => [ 'data' => [ 'type' => 'Event', 'id' => 'smoke-e1' ] ] ] ],\n                [ 'id' => 'smoke-2', 'type' => 'EventInstance', 'attributes' => [ 'starts_at' => $iso( '+12 days 08:00' ), 'ends_at' => $iso( '+12 days 09:00' ), 'updated_at' => 'T1' ], 'relationships' => [ 'event' => [ 'data' => [ 'type' => 'Event', 'id' => 'smoke-e2' ] ] ] ],\n            ],\n            'included' => [\n                [ 'id' => 'smoke-e1', 'type' => 'Event', 'attributes' => [ 'name' => 'Smoke All-Day Event' ] ],\n                [ 'id' => 'smoke-e2', 'type' => 'Event', 'attributes' => [ 'name' => $m['name'] ] ],\n            ],\n            'meta' => [ 'total_count' => 2 ],\n        ];\n    return [ 'headers' => [], 'body' => wp_json_encode( $body ), 'response' => [ 'code' => (int) $m['status'], 'message' => '' ], 'cookies' => [], 'filename' => null ];\n}, 10, 3 );\n"
+    },
+    {
+      "step": "runPHP",
+      "code": "<?php require_once \"/wordpress/wp-load.php\"; if ( ! class_exists( \"CCTEC_Sync\" ) ) { throw new Exception( \"comms-church-pco-tec did not boot — cannot run the sync fixture.\" ); } update_option( \"cctec_app_id\", \"smoke-app-id\" ); update_option( \"cctec_secret\", \"smoke-secret\" ); update_option( \"cctec_sync_source\", \"calendar_all\" ); update_option( \"cctec_delete_removed\", \"1\" ); update_option( \"cctec_sideload_images\", \"0\" ); update_option( \"smoke_pco_mock\", [ \"status\" => 200, \"name\" => \"Smoke Breakfast Original\" ] ); ( new CCTEC_Sync() )->run();"
+    },
+    {
+      "step": "runPHP",
+      "code": "<?php require_once \"/wordpress/wp-load.php\"; if ( ! class_exists( \"CCTEC_Sync\" ) ) { throw new Exception( \"comms-church-pco-tec did not boot — cannot run the sync fixture.\" ); } update_option( \"smoke_pco_mock\", [ \"status\" => 200, \"name\" => \"Smoke Breakfast Renamed\" ] ); ( new CCTEC_Sync() )->run();"
+    },
+    {
+      "step": "runPHP",
+      "code": "<?php require_once \"/wordpress/wp-load.php\"; if ( ! class_exists( \"CCTEC_Sync\" ) ) { throw new Exception( \"comms-church-pco-tec did not boot — cannot run the sync fixture.\" ); } update_option( \"smoke_pco_mock\", [ \"status\" => 401, \"name\" => \"\" ] ); ( new CCTEC_Sync() )->run(); delete_option( \"smoke_pco_mock\" ); delete_option( \"cctec_app_id\" ); delete_option( \"cctec_secret\" );"
     }
   ]
 }

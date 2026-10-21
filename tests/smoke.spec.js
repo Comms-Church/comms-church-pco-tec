@@ -39,6 +39,37 @@ test.describe('The Events Calendar integration', () => {
   });
 });
 
+// The blueprint runs three real syncs against a fake Planning Center
+// (mu-plugins/smoke-pco-mock.php): a normal feed, the same feed with an event
+// renamed, then a 401 with "delete removed events" on.
+test.describe('PCO sync (mocked Planning Center)', () => {
+  async function eventTitles(request) {
+    const res = await request.get('/wp-json/tribe/events/v1/events?per_page=50');
+    expect(res.status()).toBe(200);
+    return ((await res.json()).events || []).map((e) => e.title);
+  }
+
+  test('all-day PCO event (midnight start) is created in TEC', async ({ request }) => {
+    expect(await eventTitles(request)).toContain('Smoke All-Day Event');
+  });
+
+  test('event renamed in PCO is updated even though its instance updated_at did not change', async ({ request }) => {
+    const titles = await eventTitles(request);
+    expect(titles).toContain('Smoke Breakfast Renamed');
+    expect(titles).not.toContain('Smoke Breakfast Original');
+  });
+
+  test('a PCO API error is logged and does not trash synced events', async ({ page, request }) => {
+    const titles = await eventTitles(request);
+    expect(titles).toContain('Smoke All-Day Event');
+    expect(titles).toContain('Smoke Breakfast Renamed');
+
+    await page.goto('/wp-admin/options-general.php?page=cctec-settings');
+    await expect(page.locator('#cctec-log')).toContainText('Failed to fetch event instances');
+    await expect(page.locator('#cctec-log')).not.toContainText('Trashed post');
+  });
+});
+
 test.describe('Admin pages', () => {
   test('settings page (options-general.php?page=cctec-settings) renders without PHP errors', async ({ page }) => {
     await page.goto('/wp-admin/options-general.php?page=cctec-settings');
