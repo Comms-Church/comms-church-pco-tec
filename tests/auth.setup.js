@@ -67,5 +67,15 @@ setup('warm up The Events Calendar', async ({ browser, request }) => {
     await page.goto('/wp-admin/edit.php?post_type=tribe_events');
     return (await page.locator('#the-list a.row-title').count()) >= SEEDED_EVENTS;
   }, 'TEC admin events list');
+
+  // Playground starts answering requests before the blueprint's last steps
+  // finish. The mocked-sync fixture ends with a failing sync, then deletes its
+  // fake credentials — wait for both, or tests (and screenshots) race it.
+  await waitFor(async () => {
+    await page.goto('/wp-admin/options-general.php?page=cctec-settings');
+    const log = await page.locator('#cctec-log').innerText();
+    return log.includes('Failed to fetch event instances')
+      && (await page.locator('#cctec_app_id').inputValue()) === '';
+  }, 'Mocked PCO sync fixture');
   await context.close();
 });

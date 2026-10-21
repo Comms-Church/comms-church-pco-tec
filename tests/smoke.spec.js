@@ -50,19 +50,19 @@ test.describe('PCO sync (mocked Planning Center)', () => {
   }
 
   test('all-day PCO event (midnight start) is created in TEC', async ({ request }) => {
-    expect(await eventTitles(request)).toContain('Smoke All-Day Event');
+    expect(await eventTitles(request)).toContain('Church Workday');
   });
 
   test('event renamed in PCO is updated even though its instance updated_at did not change', async ({ request }) => {
     const titles = await eventTitles(request);
-    expect(titles).toContain('Smoke Breakfast Renamed');
-    expect(titles).not.toContain('Smoke Breakfast Original');
+    expect(titles).toContain('Leadership Prayer Breakfast');
+    expect(titles).not.toContain('Leadership Breakfast');
   });
 
   test('a PCO API error is logged and does not trash synced events', async ({ page, request }) => {
     const titles = await eventTitles(request);
-    expect(titles).toContain('Smoke All-Day Event');
-    expect(titles).toContain('Smoke Breakfast Renamed');
+    expect(titles).toContain('Church Workday');
+    expect(titles).toContain('Leadership Prayer Breakfast');
 
     await page.goto('/wp-admin/options-general.php?page=cctec-settings');
     await expect(page.locator('#cctec-log')).toContainText('Failed to fetch event instances');
