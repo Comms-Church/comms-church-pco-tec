@@ -29,7 +29,8 @@
         var $picker = $('#cctec_brand_color');
         var $hex    = $('#cctec_brand_color_hex');
         if ($picker.length && $hex.length) {
-            $picker.on('input', function () { $hex.val($picker.val()); });
+            // Re-run the hex check so a picked color clears an earlier invalid flag.
+            $picker.on('input', function () { $hex.val($picker.val()).trigger('input'); });
             $hex.on('input', function () {
                 var valid = /^#[0-9a-fA-F]{6}$/.test($hex.val());
                 // sanitize_hex_color() blanks anything else on save — say so now.

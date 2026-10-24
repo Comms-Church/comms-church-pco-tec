@@ -337,6 +337,11 @@ class CCTEC_Admin {
                     <input type="hidden" name="cctec_action" value="sync_now">
                     <button type="submit" class="button button-primary"><?php esc_html_e( 'Sync Now', 'comms-church-pco-tec' ); ?></button>
                 </form>
+                <form method="post" style="display:inline-block;margin-right:12px">
+                    <?php wp_nonce_field( 'cctec_action' ); ?>
+                    <input type="hidden" name="cctec_action" value="clear_cache">
+                    <button type="submit" class="button"><?php esc_html_e( 'Clear API Cache', 'comms-church-pco-tec' ); ?></button>
+                </form>
                 <?php /* Destructive: set apart from the routine buttons and styled as such. */ ?>
                 <form method="post" class="cctec-danger-zone">
                     <?php wp_nonce_field( 'cctec_action' ); ?>
@@ -344,11 +349,6 @@ class CCTEC_Admin {
                     <input type="hidden" name="cctec_force"  value="1">
                     <button type="submit" class="button cctec-btn-danger"><?php esc_html_e( 'Force Full Re-sync', 'comms-church-pco-tec' ); ?></button>
                     <span class="description"><?php esc_html_e( 'Overwrites every synced event from PCO, including manual edits.', 'comms-church-pco-tec' ); ?></span>
-                </form>
-                <form method="post" style="display:inline-block;margin-right:12px">
-                    <?php wp_nonce_field( 'cctec_action' ); ?>
-                    <input type="hidden" name="cctec_action" value="clear_cache">
-                    <button type="submit" class="button"><?php esc_html_e( 'Clear API Cache', 'comms-church-pco-tec' ); ?></button>
                 </form>
             </div>
 
