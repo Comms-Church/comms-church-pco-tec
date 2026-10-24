@@ -19,7 +19,7 @@ The skill is mostly about gesture-driven motion (springs, flicks, momentum). The
 
 | Rank | Plugin | Finding | Severity | Fixed in this pass |
 | --- | --- | --- | --- | --- |
-| 1 | Recurring Events | Changing a pattern permanently deletes future dates without warning | Critical | In part (warning added) |
+| 1 | Recurring Events | Changing a pattern permanently deletes future dates without warning | Critical | Yes |
 | 2 | Sermon Suite | A failed save leaves the editor stuck on "Saving…" | Critical | Yes |
 | 3 | Sermon Suite | No warning before leaving with unsaved edits | Critical | Yes |
 | 4 | PCO TEC | Events without a featured image show an empty gray box | Critical | Yes |
@@ -28,7 +28,7 @@ The skill is mostly about gesture-driven motion (springs, flicks, momentum). The
 | 7 | Sermon Suite, PCO TEC | No visible keyboard focus | High | Yes |
 | 8 | PCO | Generator preview doesn't match the live page | High | Yes |
 | 9 | Groups | Filtering changes the page silently | High | Yes |
-| 10 | Groups, PCO, PCO TEC | Cards lift on hover but aren't links | High / Medium / Low | Yes in Groups and PCO; TEC still open |
+| 10 | Groups, PCO, PCO TEC | Cards lift on hover but aren't links | High / Medium / Low | Yes |
 
 A pattern across the suite: Groups and PCO already handle reduced motion, focus rings and container sizing well, while Sermon Suite and PCO TEC don't. A shared base stylesheet for focus, press and reduced-motion styles would stop these drifting apart again.
 
@@ -166,19 +166,21 @@ $('input[name="cctec_action"][value="sync_now"]').closest('form').on('submit', f
 
 ## Fixes applied in this pass
 
-I applied 29 of the 61 fixes in full and 5 more in part, covering every Critical and High finding, on the `claude/quirky-feynman-2ppasd` branch of each repo. Each repo also got the `apple-design` skill and a Markdown copy of its section, both under `.claude/`, which the release zip already excludes.
+All 61 fixes are now applied on the `claude/quirky-feynman-2ppasd` branch of each repo: 29 in the first pass and the other 32 in a second. Each repo also has the `apple-design` skill and a Markdown copy of its section under `.claude/`, which the release zip excludes.
 
-| Plugin | Applied in full | Applied in part | Still open |
+| Plugin | First pass | Second pass | Also changed |
 | --- | --- | --- | --- |
-| Sermon Suite | 1, 2, 3, 4, 5, 6, 7 | 8 (`composes:` bug only), 9 (heading tracking only), 11 (iframe titles, remove-button label) | 10, 12–17 |
-| Groups | 1, 2, 3, 4, 7 | — | 5, 6, 8–12 |
-| PCO | 1, 2, 3, 4, 7, 8 | — | 5, 6, 9–12 |
-| PCO TEC | 1, 2, 3, 4, 5, 6, 7, 8 | — | 9–12 |
-| Recurring Events | 4, 5, 8 | 1 (warning only), 2 (summary line only) | 3, 6, 7 |
+| Sermon Suite | 1–7, part of 8, 9 and 11 | Rest of 8, 9 and 11; 10, 12–17 | Emoji removed from every admin screen, not only the examples cited |
+| Groups | 1–4, 7 | 5, 6, 8–12 | Saving credentials now runs the connection test automatically |
+| PCO | 1–4, 7, 8 | 5, 6, 9–12 | Fixed an older bug: on phones, 3- and 4-column grids never dropped to one column |
+| PCO TEC | 1–8 | 9–12, plus the destructive-button styling from #2 | — |
+| Recurring Events | 4, 5, 8, part of 1 and 2 | Rest of 1 and 2; 3, 6, 7 | Removed dates go to the Trash, and a notice says what changed |
 
-Two changes need a second opinion before going further:
+Check these behavior changes before merging:
 
-- **Recurring Events #1:** I added the warning but kept `wp_delete_post( …, true )`. Switching to `wp_trash_post()` changes what `children_of()` sees, so it needs its own change and test.
-- **PCO #1:** making the menu drop down meant removing `overflow: hidden` from `.ccpco-card`. The image now rounds its own corners. Check a theme that adds a border to cards.
+- **Recurring Events:** dates a changed rule drops now go to the Trash, and `children_of()` ignores trashed dates. If the rule later wants that date again, it creates a fresh event instead of restoring the trashed one. Permanently deleting a parent, or rolling back a migration, still removes trashed dates as well.
+- **PCO:** signup cards no longer clip their overflow, so the calendar menu can drop down. The grid is also wrapped in a new `.ccpco-signup-list-wrap` div for the container queries. Check any theme CSS that targets the grid's parent.
+- **Sermon Suite:** corner radii now follow a five-step scale (3 px becomes 4 px, 10 px becomes 12 px, pills become 999 px), and grid card titles drop from 1.4× to 1.1×. Expect small visual differences.
+- **Groups:** the Secret field now loads blank. Leaving it blank keeps the saved secret.
 
-**Verification.** The repos' Playwright suites couldn't run here: the environment's network policy blocks `wordpress.org` and `playground.wordpress.net`, which WordPress Playground needs to boot. Instead, every edited PHP file passes `php -l` and every edited script passes `node --check`. A headless-Chromium harness loaded each plugin's real CSS and JS against markup copied from its renderer and passed 39 of 39 checks. Those covered the menu's direction, focus and keyboard behavior and that the card no longer clips it; the Groups count, reset and focus return; the TEC confirm and Syncing state; the recurrence summary text; and the Sermon Suite chip, badge and focus fixes. Run `npm test` in each repo locally before merging.
+**Verification.** The WordPress test suites still can't run here, because the network policy blocks `wordpress.org` and `playground.wordpress.net`. Every changed PHP file passes `php -l`, and every changed script, including inline `<script>` blocks, passes `node --check`. The headless-Chromium harness now runs 64 checks against each plugin's real CSS and JS, and all pass. The Recurring Events next-dates preview was checked against a stubbed admin-ajax response, so its server endpoint is untested. Run `npm test` in each repo locally before merging.

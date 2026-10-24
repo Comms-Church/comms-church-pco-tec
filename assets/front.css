@@ -57,14 +57,14 @@
   overflow: hidden;
   display: flex;
   flex-direction: column;
-  transition: transform .2s ease, box-shadow .2s ease;
-  max-width: 480px; /* prevents it stretching full-width in wide layouts */
+  transition: box-shadow .2s ease;
+  /* Stops a lone card stretching full-width; set --cctec-card-max: none to let
+     cards fill a grid column. */
+  max-width: var(--cctec-card-max, 480px);
 }
 
-.cctec-event-card:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(0,0,0,.11);
-}
+/* Shadow only — the card isn't one link, so it shouldn't lift like one. */
+.cctec-event-card:hover { box-shadow: 0 6px 20px rgba(0,0,0,.11); }
 
 /* ── Card image ──────────────────────────────────────────────────────────── */
 .cctec-card-image {
@@ -112,11 +112,12 @@
 }
 
 .cctec-card-title {
-  font-size: 1.05rem;
+  font-size: 1.2rem;
   font-weight: 700;
   color: var(--cctec-text);
   margin: 0 0 .2rem;
-  line-height: 1.3;
+  line-height: 1.25;
+  letter-spacing: -0.01em;
 }
 
 .cctec-card-title a {
@@ -197,5 +198,4 @@
 @media (prefers-reduced-motion: reduce) {
   .cctec-event-card,
   .cctec-btn { transition: none !important; }
-  .cctec-event-card:hover { transform: none; }
 }
