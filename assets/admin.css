@@ -24,8 +24,14 @@
     border-radius: 3px;
 }
 
-.cctec-api-status.ok  { background: #d4edda; color: #155724; }
-.cctec-api-status.err { background: #f8d7da; color: #721c24; }
+/* WordPress admin notice colors, so status reads the same as core screens. */
+.cctec-api-status {
+    padding: 2px 8px 2px 6px;
+    border-left: 4px solid;
+    background: #fff;
+}
+.cctec-api-status.ok  { border-left-color: #00a32a; color: #1d2327; }
+.cctec-api-status.err { border-left-color: #d63638; color: #1d2327; }
 
 /* ── Cards ───────────────────────────────────────────────────────────────── */
 .cctec-card {
@@ -39,10 +45,8 @@
 .cctec-card h2 {
     margin-top: 0;
     margin-bottom: 12px;
-    font-size: 14px;
+    font-size: 1.1em;
     font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: .05em;
     color: #1d2327;
     border-bottom: 1px solid #f0f0f0;
     padding-bottom: 8px;
@@ -51,7 +55,7 @@
 /* ── Sync Log ────────────────────────────────────────────────────────────── */
 .cctec-log-table {
     margin-top: 8px;
-    font-size: 12px;
+    font-size: 13px;
     font-family: monospace;
 }
 
@@ -91,3 +95,14 @@
     margin: 4px 0;
     color: #3c434a;
 }
+
+/* ── Destructive action ──────────────────────────────────────────────────── */
+.cctec-danger-zone {
+    margin-top: 16px;
+    padding-top: 12px;
+    border-top: 1px solid #f0f0f1;
+}
+.cctec-danger-zone .description { margin-left: 8px; }
+.wp-core-ui .button.cctec-btn-danger { color: #b32d2e; border-color: #b32d2e; }
+.wp-core-ui .button.cctec-btn-danger:hover,
+.wp-core-ui .button.cctec-btn-danger:focus { color: #fff; background: #b32d2e; border-color: #b32d2e; }
