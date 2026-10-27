@@ -2,6 +2,10 @@
 
 Syncs Planning Center Events (Calendar API v2) into The Events Calendar (TEC) on WordPress. Optionally attaches PCO Registrations signup links and ticket pricing to matched events.
 
+## Pay what's fair
+
+This plugin is free so churches can spend less on their websites. If you use it in paid work — building or managing church websites for a fee — we ask that you [pay what you think is fair](https://buy.stripe.com/00w5kD8BF21R6SigP62B201). There are no license keys and no checks; it's the honor system. It keeps the plugins maintained and free for everyone else.
+
 ## What it does
 
 - Pulls all upcoming event instances from PCO Calendar v2 on a configurable schedule (hourly by default via WP-Cron)
