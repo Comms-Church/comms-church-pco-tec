@@ -227,7 +227,8 @@ class CCTEC_Sync {
 
         // Change detection — skip early before any extra API calls.
         if ( $existing_id && ! $force ) {
-            if ( get_post_meta( $existing_id, '_pco_fingerprint', true ) === $fingerprint ) {
+            if ( get_post_meta( $existing_id, '_pco_fingerprint', true ) === $fingerprint
+                 && ! $this->timezone_changed( $existing_id ) ) {
                 return 'noop';
             }
         }
@@ -338,7 +339,8 @@ class CCTEC_Sync {
 
         // Change detection.
         if ( $existing_id && ! $force ) {
-            if ( get_post_meta( $existing_id, '_pco_fingerprint', true ) === $fingerprint ) {
+            if ( get_post_meta( $existing_id, '_pco_fingerprint', true ) === $fingerprint
+                 && ! $this->timezone_changed( $existing_id ) ) {
                 return 'noop';
             }
             // Conflict strategy.
@@ -631,7 +633,27 @@ class CCTEC_Sync {
             'EventEndHour'       => $e->format( 'g' ),
             'EventEndMinute'     => $e->format( 'i' ),
             'EventEndMeridian'   => $e->format( 'a' ),
+            'EventTimezone'      => $this->site_timezone(),
         ];
+    }
+
+    /**
+     * The site timezone as TEC stores it on an event: 'America/New_York', or
+     * 'UTC+0' when Settings → General is set to an offset rather than a city.
+     */
+    private function site_timezone(): string {
+        return class_exists( 'Tribe__Events__Timezones' )
+            ? Tribe__Events__Timezones::wp_timezone_string()
+            : wp_timezone_string();
+    }
+
+    /**
+     * Times are written as site-local wall-clock, so correcting the site
+     * timezone must rewrite synced events even though nothing changed in PCO.
+     */
+    private function timezone_changed( int $post_id ): bool {
+        $stored = get_post_meta( $post_id, '_EventTimezone', true );
+        return $stored && $stored !== $this->site_timezone();
     }
 
     // ── Cron ──────────────────────────────────────────────────────────────────

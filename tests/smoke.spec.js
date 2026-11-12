@@ -59,6 +59,21 @@ test.describe('PCO sync (mocked Planning Center)', () => {
     expect(titles).not.toContain('Leadership Breakfast');
   });
 
+  // The first sync runs on WordPress's default UTC+0, so a 6 pm event lands at
+  // 11 pm; the blueprint then sets America/New_York, as a church would on
+  // noticing. Church Workday is unchanged in PCO, so only the timezone check
+  // can move it — and it moves to midnight, which TEC once rejected.
+  test('fixing the site timezone moves already-synced events to local time', async ({ request }) => {
+    const res = await request.get('/wp-json/tribe/events/v1/events?per_page=50');
+    expect(res.status()).toBe(200);
+    const events = (await res.json()).events || [];
+    const byTitle = (title) => events.find((e) => e.title === title);
+
+    expect(byTitle('Church Workday').timezone).toBe('America/New_York');
+    expect(byTitle('Church Workday').start_date).toMatch(/ 00:00:00$/);
+    expect(byTitle('Leadership Prayer Breakfast').start_date).toMatch(/ 08:00:00$/);
+  });
+
   test('a PCO API error is logged and does not trash synced events', async ({ page, request }) => {
     const titles = await eventTitles(request);
     expect(titles).toContain('Church Workday');
@@ -79,6 +94,32 @@ test.describe('Admin pages', () => {
     await expectClean(page);
     const body = await page.locator('body').innerText();
     expect(body).toContain('PCO Events Sync');
+  });
+
+  test('settings page warns when the site timezone is a UTC offset, not a city', async ({ page }) => {
+    const settings = '/wp-admin/options-general.php?page=cctec-settings';
+    async function setTimezone(value) {
+      await page.goto('/wp-admin/options-general.php');
+      await page.locator('#timezone_string').selectOption(value);
+      // Submitted directly: while the site is on UTC, TEC's own timezone notice
+      // keeps Save Changes from ever counting as "stable" for a click.
+      await page.locator('#submit').evaluate((btn) => btn.form.requestSubmit(btn));
+      // Not waitForURL: WordPress strips settings-updated=true from the address
+      // bar (replaceState) before the load event fires.
+      await expect(page.locator('#setting-error-settings_updated')).toBeVisible();
+    }
+
+    await page.goto(settings);
+    await expect(page.locator('#wpwrap')).toBeVisible();
+    await expect(page.locator('.cctec-timezone-warning')).toHaveCount(0);
+
+    await setTimezone('UTC+0');
+    try {
+      await page.goto(settings);
+      await expect(page.locator('.cctec-timezone-warning')).toContainText('UTC+0');
+    } finally {
+      await setTimezone('America/New_York');
+    }
   });
 
   test('TEC events list shows seeded events with PCO meta intact', async ({ page }) => {

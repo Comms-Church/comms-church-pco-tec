@@ -22,6 +22,9 @@ This plugin is free so churches can spend less on their websites. If you use it 
 - PHP 8.1+
 - **The Events Calendar** plugin (free or Pro) — active before this plugin activates
 - A Planning Center account with access to the Calendar module
+- The site timezone set to a **city** under Settings → General (WordPress defaults to UTC+0)
+
+**Timezone.** PCO sends times in UTC and the sync writes them in the site timezone, so on a UTC+0 site a 6 pm Eastern event shows as 11 pm. The settings screen warns when the timezone is an offset rather than a city. Fixing it needs no force re-sync: an event whose stored timezone no longer matches the site's is rewritten on the next sync, even if nothing changed in PCO.
 
 ## Installation
 

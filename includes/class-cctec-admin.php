@@ -161,6 +161,18 @@ class CCTEC_Admin {
             <h1><?php esc_html_e( 'PCO Events → The Events Calendar', 'comms-church-pco-tec' ); ?></h1>
             <p class="description"><?php esc_html_e( 'Syncs Planning Center Events into The Events Calendar. Events are created/updated automatically; registration links are optionally attached when a matching PCO Signup is found.', 'comms-church-pco-tec' ); ?></p>
 
+            <?php /* PCO times are converted to the site timezone; WordPress defaults to UTC+0. */ ?>
+            <?php if ( ! get_option( 'timezone_string' ) ) : ?>
+            <div class="notice notice-warning inline cctec-timezone-warning"><p>
+                <?php printf(
+                    /* translators: 1: UTC offset such as "UTC+0", 2: link to Settings → General */
+                    esc_html__( 'Your site timezone is %1$s, not a city, so synced events can show at the wrong time. Choose your church\'s city under %2$s — the next sync moves existing events to the right time.', 'comms-church-pco-tec' ),
+                    esc_html( 'UTC' . ( (float) get_option( 'gmt_offset' ) >= 0 ? '+' : '' ) . (float) get_option( 'gmt_offset' ) ),
+                    '<a href="' . esc_url( admin_url( 'options-general.php' ) ) . '">' . esc_html__( 'Settings → General → Timezone', 'comms-church-pco-tec' ) . '</a>'
+                ); ?>
+            </p></div>
+            <?php endif; ?>
+
             <?php /* ── Status bar ── */ ?>
             <div class="cctec-status-bar">
                 <span><?php echo esc_html__( 'Last sync:', 'comms-church-pco-tec' ) . ' ' . esc_html( $last_sync ); ?></span>
