@@ -74,6 +74,13 @@ test.describe('PCO sync (mocked Planning Center)', () => {
     expect(byTitle('Leadership Prayer Breakfast').start_date).toMatch(/ 08:00:00$/);
   });
 
+  test('a matched signup links to its Church Center event page, not the login-gated form', async ({ request }) => {
+    const res = await request.get('/wp-json/tribe/events/v1/events?per_page=50');
+    expect(res.status()).toBe(200);
+    const workday = ((await res.json()).events || []).find((e) => e.title === 'Church Workday');
+    expect(workday.website).toBe('https://smoke.churchcenter.com/registrations/events/777');
+  });
+
   test('a PCO API error is logged and does not trash synced events', async ({ page, request }) => {
     const titles = await eventTitles(request);
     expect(titles).toContain('Church Workday');

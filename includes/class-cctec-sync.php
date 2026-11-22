@@ -25,7 +25,7 @@
  *  _pco_instance_id       string   PCO event_instance ID (unique per occurrence)
  *  _pco_registration_id   string   PCO signup ID (registrations mode)
  *  _pco_signup_id         string   "signup_{id}" key for stale-delete lookup
- *  _pco_registration_url  string   Direct PCO registration URL
+ *  _pco_registration_url  string   Church Center event page (or the church's own link)
  *  _pco_min_price         float|null
  *  _pco_max_price         float|null
  *  _pco_ticket_types      string   JSON [{name, price, capacity}]
@@ -204,8 +204,7 @@ class CCTEC_Sync {
         $starts_at   = $time_attrs['starts_at'] ?? '';
         $ends_at     = $time_attrs['ends_at']   ?? '';
         $all_day     = (bool) ( $time_attrs['all_day'] ?? false );
-        // Correct field per PCO Registrations OpenAPI spec.
-        $reg_url     = $attrs['new_registration_url'] ?? $attrs['registration_url'] ?? $attrs['public_url'] ?? '';
+        $reg_url     = $this->signup_url( $attrs );
         $updated_at  = $attrs['updated_at'] ?? '';
 
         if ( ! $name ) {
@@ -309,7 +308,7 @@ class CCTEC_Sync {
         $starts_at   = $attrs['starts_at']       ?? $attrs['all_day_start'] ?? '';
         $ends_at     = $attrs['ends_at']         ?? $attrs['all_day_end']   ?? '';
         $all_day     = (bool) ( $attrs['all_day'] ?? false );
-        $pco_url     = $event_attrs['registration_url'] ?? $event_attrs['public_url'] ?? '';
+        $pco_url     = $this->event_page_url( $event_attrs['registration_url'] ?? $event_attrs['public_url'] ?? '' );
         $updated_at  = $attrs['updated_at'] ?? '';
 
         if ( ! $name || ! $starts_at ) {
@@ -331,11 +330,17 @@ class CCTEC_Sync {
 
         // Name and description live on the parent Event, so the instance's own
         // updated_at doesn't move when only those change.
-        $fingerprint = $this->fingerprint( [
+        $fingerprint_parts = [
             $updated_at, $name, $description, $starts_at, $ends_at, $all_day, $pco_url,
             $loc_id, $included['Location'][ $loc_id ]['attributes'] ?? [],
             $matched_signup['id'] ?? '', $matched_signup['attributes']['updated_at'] ?? '',
-        ] );
+        ];
+        // The signup link moved from the form to the event page in 1.4.2;
+        // including it rewrites matched events once so they pick that up.
+        if ( $matched_signup ) {
+            $fingerprint_parts[] = $this->signup_url( $matched_signup['attributes'] ?? [] );
+        }
+        $fingerprint = $this->fingerprint( $fingerprint_parts );
 
         // Change detection.
         if ( $existing_id && ! $force ) {
@@ -364,10 +369,7 @@ class CCTEC_Sync {
         $max_price = null;
         $ticket_types = [];
         if ( $matched_signup ) {
-            $sig_reg_url = $matched_signup['attributes']['new_registration_url']
-                        ?? $matched_signup['attributes']['registration_url']
-                        ?? $matched_signup['attributes']['public_url']
-                        ?? '';
+            $sig_reg_url = $this->signup_url( $matched_signup['attributes'] ?? [] );
             if ( $sig_reg_url ) $reg_url = esc_url_raw( $sig_reg_url );
 
             $td = $this->fetch_ticket_data( (int) $matched_signup['id'] );
@@ -443,6 +445,25 @@ class CCTEC_Sync {
         }
 
         return [ (int) $post_id, $action ];
+    }
+
+    /**
+     * Where a signup's Register button should go. PCO's new_registration_url
+     * (correct field per the Registrations OpenAPI spec) is the form itself.
+     */
+    private function signup_url( array $attrs ): string {
+        return $this->event_page_url(
+            $attrs['new_registration_url'] ?? $attrs['registration_url'] ?? $attrs['public_url'] ?? ''
+        );
+    }
+
+    /**
+     * Church Center's form (…/registrations/events/123/reservations/new) sends
+     * anyone signed out to a login screen; the event page shows the details
+     * and its own Register button. Other URLs pass through unchanged.
+     */
+    private function event_page_url( string $url ): string {
+        return (string) preg_replace( '#^(https://[^/]+/registrations/events/\d+)/reservations/new/?(?=$|[?\#])#', '$1', $url );
     }
 
     private function fingerprint( array $parts ): string {
